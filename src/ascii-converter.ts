@@ -375,7 +375,7 @@ export async function gifToAscii(
      * - Se quiere remarcar más las líneas débilmente iluminadas
      */
     if (invert) {
-      ascii = invertAscii(ascii);
+      ascii = invertAscii(ascii, chars);
     }
 
     /**
@@ -445,18 +445,40 @@ function applyStencil(ascii: string, originalChars: string, threshold: number): 
 /**
  * Post-process: Invierte un frame ASCII
  * 
- * Convierte ' ' (espacio) a '#' y viceversa.
- * Útil para GIFs con fondo oscuro y líneas claras.
+ * Convierte ' ' (espacio) a '#' y viceversa para gradient.
+ * Para retro charset (░▒▓█), invierte la densidad:
+ * - ' ' → █ (espacio a sólido)
+ * - ░ → ▓ (light a dark)
+ * - ▒ → ▒ (medium se mantiene)
+ * - ▓ → ░ (dark a light)
+ * - █ → ' ' (sólido a espacio)
  * 
  * @param ascii - Frame ASCII de entrada (string multilínea)
+ * @param charset - Charset usado ('.,-:=+*#%@' o ' ░▒▓█')
  * @returns Frame con inversión aplicada
  */
-function invertAscii(ascii: string): string {
+function invertAscii(ascii: string, charset: string): string {
   const lines = ascii.split('\n');
   const invertedLines = lines.map(line => {
     let result = '';
     for (const char of line) {
-      result += char === ' ' ? '#' : ' ';
+      if (char === ' ') {
+        result += charset === ' ░▒▓█' ? '█' : '@';
+      } else if (char === '@' || char === '█') {
+        result += ' ';
+      } else if (charset === ' ░▒▓█') {
+        if (char === '░') result += '▓';
+        else if (char === '▓') result += '░';
+        else if (char === '▒') result += '▒';
+        else result += ' ';
+      } else {
+        const idx = charset.indexOf(char);
+        if (idx > 0) {
+          result += charset[charset.length - idx] || ' ';
+        } else {
+          result += ' ';
+        }
+      }
     }
     return result;
   });
