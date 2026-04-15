@@ -32,7 +32,7 @@ import { basename, extname } from "path";
  * - exported: Exportación completada exitosamente
  * - error: Error en alguna operación (archivo no encontrado, etc.)
  */
-type AppStatus = "idle" | "converting" | "preview" | "exported" | "error";
+type AppStatus = "landing" | "idle" | "converting" | "preview" | "exported" | "error";
 
 /**
  * Opciones de post-process disponibles
@@ -62,6 +62,28 @@ interface Options {
  * |  108 frames (stencil+invert)                    |  <- Status bar
  * +--------------------------------------------------+
  */
+
+/**
+ * Aplica efecto glitch a un string (contador)
+ * 
+ * Reemplaza aleatoriamente algunos caracteres por símbolos
+ * para simular falla en display digital.
+ * 
+ * @param str - String de entrada
+ * @param intensity - Probabilidad de glitch por carácter (0-1)
+ * @returns String con efecto glitch
+ */
+function glitchText(str: string, intensity: number = 0.12): string {
+  const glitchChars = "░▒▓#$%&";
+  return str.split('').map(char => {
+    if (char === '/' || char === ' ') return char;
+    if (Math.random() < intensity) {
+      return glitchChars[Math.floor(Math.random() * glitchChars.length)];
+    }
+    return char;
+  }).join('');
+}
+
 function App() {
   // =====================================================================
   // ESTADO DE LA APLICACIÓN
@@ -77,7 +99,7 @@ function App() {
    * Estado actual de la aplicación
    * Controla qué componentes UI se muestran en cada momento
    */
-  const [status, setStatus] = useState<AppStatus>("idle");
+  const [status, setStatus] = useState<AppStatus>("landing");
   
   /**
    * Frames ASCII convertidos
@@ -107,6 +129,16 @@ function App() {
    * Mostrada al usuario tras exportar exitosamente
    */
   const [outputPath, setOutputPath] = useState("");
+
+  /**
+   * Flag para mostrar la ayuda de botones
+   */
+  const [showHelp, setShowHelp] = useState(false);
+
+  /**
+   * Flag para mostrar mensaje de export exitoso
+   */
+  const [showExportSuccess, setShowExportSuccess] = useState(false);
 
   /**
    * Opciones de post-process
@@ -198,13 +230,13 @@ function App() {
    * evitando re-renderizados innecesarios.
    */
   const handleConvert = useCallback(async () => {
-    // Validación: no procesar si no hay ruta
-    if (!gifPath) return;
+    // Si estamos en landing, usar el default path
+    const pathToUse = status === "landing" ? "input/1.gif" : gifPath;
     
     // Validación: verificar existencia del archivo
-    if (!existsSync(gifPath)) {
+    if (!existsSync(pathToUse)) {
       setStatus("error");
-      setErrorMsg(`File "${gifPath}" not found`);
+      setErrorMsg(`File "${pathToUse}" not found`);
       return;
     }
 
@@ -219,7 +251,7 @@ function App() {
         : ".,-:=+*#%@";
       
       // Llamada al módulo de conversión con todas las opciones
-      const result = await gifToAscii(gifPath, { ...options, chars });
+      const result = await gifToAscii(pathToUse, { ...options, chars });
       
       // Actualizar estado con frames convertidos
       setFrames(result);
@@ -230,7 +262,7 @@ function App() {
       setStatus("error");
       setErrorMsg(err?.message || "Unknown error");
     }
-  }, [gifPath, options]);
+  }, [gifPath, options, status]);
 
   /**
    * Handler de exportación a JSON
@@ -246,11 +278,11 @@ function App() {
     const baseName = basename(gifPath, extname(gifPath));
     const out = `src/assets/animation/${baseName}.json`;
     
-    // Serialización JSON con indentación para legibilidad
     writeFileSync(out, JSON.stringify(frames, null, 2));
     
     setOutputPath(out);
-    setStatus("exported");
+    setShowExportSuccess(true);
+    setStatus("preview");
   }, [frames, gifPath]);
 
   /**
@@ -259,6 +291,20 @@ function App() {
    */
   const togglePlay = useCallback(() => {
     setIsPlaying(prev => !prev);
+  }, []);
+
+  /**
+   * Toggle de ayuda
+   */
+  const toggleHelp = useCallback(() => {
+    setShowHelp(prev => !prev);
+  }, []);
+
+  /**
+   * Handler para comenzar desde el landing
+   */
+  const startFromLanding = useCallback(() => {
+    setStatus("idle");
   }, []);
 
   // =====================================================================
@@ -289,6 +335,20 @@ function App() {
     // Función de cleanup - cancela el timeout
     return () => clearTimeout(timer);
   }, [isPlaying, previewIndex, frames]);
+
+  /**
+   * Effect para ocultar mensaje de export exitoso
+   * Se limpia cuando el usuario hace cualquier acción
+   */
+  useEffect(() => {
+    if (!showExportSuccess) return;
+    
+    const timer = setTimeout(() => {
+      setShowExportSuccess(false);
+    }, 3000);
+    
+    return () => clearTimeout(timer);
+  }, [showExportSuccess]);
 
   // =====================================================================
   // HANDLERS DE NAVEGACIÓN
@@ -329,11 +389,11 @@ function App() {
   const lines = currentFrame?.ascii.split("\n") ?? [];
   
   /**
-   * String de progreso "actual/total"
-   * Ejemplo: "12/108"
+   * String de progreso "actual/total" con efecto glitch
+   * Ejemplo: "12/108" → "1§/108" o "12/1▓8"
    */
   const progress = frames.length > 0 
-    ? `${previewIndex + 1}/${frames.length}` 
+    ? glitchText(`${previewIndex + 1}/${frames.length}`)
     : "";
 
   /**
@@ -465,15 +525,25 @@ function App() {
             >
               <text>{options.contrast === 1.0 ? "[C]" : `[C${options.contrast}]`}</text>
             </box>
-            
+
             {/* Botón de exportación */}
             <box 
-              focusable={true} 
+              focusable={false} 
               border={true} 
               borderStyle="single" 
               onMouseDown={handleExport}
             >
               <text>Export</text>
+            </box>
+
+            {/* Botón de ayuda */}
+            <box 
+              focusable={false} 
+              border={true} 
+              borderStyle="single" 
+              onMouseDown={toggleHelp}
+            >
+              <text>?</text>
             </box>
           </>
         )}
@@ -495,6 +565,21 @@ function App() {
             <text>Enter path + Convert</text>
           )}
           
+          {/* Estado: landing */}
+          {status === "landing" && (
+            <box flexDirection="column" alignItems="center">
+              <text>   ░██               ░██   ░██               ░██</text>
+              <text>   ░██                     ░██                  </text>
+              <text>░████████  ░███████  ░██░████████  ░███████  ░██</text>
+              <text>   ░██    ░██    ░██ ░██   ░██    ░██    ░██ ░██</text>
+              <text>   ░██    ░██    ░██ ░██   ░██    ░██    ░██ ░██</text>
+              <text>   ░██    ░██    ░██ ░██   ░██    ░██    ░██ ░██</text>
+              <text>    ░████  ░███████  ░██    ░████  ░███████  ░██</text>
+              <text>  </text>
+              <text> A CLI gif to ASCII processor </text>
+            </box>
+          )}
+          
           {/* Estado: convirtiendo */}
           {status === "converting" && (
             <text>Converting...</text>
@@ -514,21 +599,34 @@ function App() {
         </box>
       </box>
 
-      {/* ---------------------------------------------------------------
-         BARRA DE STATUS INFERIOR
-         Muestra el estado actual y mensajes de feedback
-         --------------------------------------------------------------- */}
-      <box justifyContent="space-between">
-        <text>
-          {status === "idle" && "Ready"}
-          {status === "converting" && "Converting..."}
-          {status === "preview" && `${frames.length} frames${optionsStr ? ` (${optionsStr})` : ''}`}
-          {status === "exported" && "✓ Exported"}
-          {status === "error" && `Error: ${errorMsg}`}
-        </text>
-        <text>
-          {(status === "preview" || status === "exported") && frames.length > 0 && progress}
-        </text>
+{/* ---------------------------------------------------------------
+          BARRA DE STATUS INFERIOR
+          Muestra el frame actual sobre el total y ayuda de botones
+          --------------------------------------------------------------- */}
+      <box flexDirection="column">
+        {/* Barra de ayuda */}
+        {showHelp && (
+          <box>
+            <text>  </text>
+            <text>[+] stencil: high contrast  </text>
+            <text>[~] invert: swap colors  </text>
+            <text>[█] retro: unicode blocks  </text>
+            <text>[B] B&W: black & white  </text>
+            <text>[C] contrast: contrast level  </text>
+          </box>
+        )}
+        
+        {/* Progress, opciones y success message */}
+        <box flexDirection="row" justifyContent="space-between">
+          <text>
+            {showExportSuccess 
+              ? "JSON Export successful !" 
+              : ((status === "preview" || status === "exported") && frames.length > 0 ? optionsStr : "")}
+          </text>
+          <text>
+            {(status === "preview" || status === "exported") && frames.length > 0 && progress}
+          </text>
+        </box>
       </box>
     </box>
   );
