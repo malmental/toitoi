@@ -4,10 +4,12 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun run --watch src/index.tsx"
+    "dev": "bun run --watch src/index.tsx",
+    "convert": "bun run src/convert.ts"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/p5": "^1.7.7"
   },
   "peerDependencies": {
     "typescript": "^5"
@@ -15,6 +17,11 @@
   "dependencies": {
     "@opentui/core": "^0.1.99",
     "@opentui/react": "^0.1.99",
-    "react": "^19.2.4"
+    "@resvg/resvg-js": "^2.6.2",
+    "jimp": "^1.6.1",
+    "omggif": "^1.0.10",
+    "p5.asciify": "^0.3.0",
+    "react": "^19.2.4",
+    "sharp": "^0.34.5"
   }
 }
