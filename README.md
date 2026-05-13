@@ -9,7 +9,7 @@ GIF to ASCII Art Converter — A TUI application that converts animated GIF file
 ```bash
 Not yet
 ```
-
+<!--
 Requires [Bun](https://bun.sh) as runtime.
 
 ## Usage
@@ -19,7 +19,7 @@ Requires [Bun](https://bun.sh) as runtime.
 ```bash
 bun dev
 ```
-
+-->
 ### Demo
 
 ![toitoidemo](public/toitoi-demo.gif)
@@ -35,6 +35,7 @@ Enter a GIF path and press Convert. Navigate frames with ◀ ▶ and toggle post
 | `[C]` | Contrast — cycles through 1.0 → 1.5 → 2.0 → 2.5 → 3.0 |
 | `Export` | Saves JSON to `src/assets/animation/` |
 
+<!--
 ### CLI Mode
 
 ```bash
@@ -105,3 +106,4 @@ Areas needing work:
 - Robust error handling for corrupted GIF files
 - Unit tests for ascii-converter.ts
 - Resolution/quality settings in the TUI
+-->
